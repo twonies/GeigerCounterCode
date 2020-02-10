@@ -37,7 +37,13 @@ int CountUnit = 0;
 int CumuRate = 60;
 float CumuDose = .01;
 int IntTime = 60;
-int JustSwitched = 0;
+int JustSwitchedPage = 0;
+int JustSwitchedLED = 0;
+int JustSwitchedBuzzer = 0;
+int LED;
+int BUZZER;
+int Updated;
+int AlertVal=5;
 
 const unsigned char gammaBitmap [] PROGMEM = {
   0x30, 0x00, 0x78, 0x70, 0xe8, 0xe0, 0xc4, 0xe0, 0x84, 0xc0, 0x05, 0xc0, 0x05, 0x80, 0x07, 0x80,
@@ -206,13 +212,10 @@ void setup() {
   tft.fillScreen(ILI9341_BLACK);
 
   //    tft.setFont(&FreeSans9pt7b);
-
-  DrawHomePage();
-
-
-
-
-
+  //  DrawHomePage();
+  //DrawSettingsPage();
+  //DrawUnitsSettings();
+  DrawAlertThreshSet();
 }
 
 
@@ -222,12 +225,20 @@ void loop() {
   int Y_Coord;
   float Battery_Val;
   float Battery_Per;
-  if (JustSwitched == 1) {
-    JustSwitched = 0;
+  if (JustSwitchedPage == 1) {
+    JustSwitchedPage = 0;
   }
+  if (JustSwitchedLED == 1) {
+    JustSwitchedLED = 0;
+  }
+  if (JustSwitchedBuzzer == 1) {
+    JustSwitchedBuzzer = 0;
+  }
+  //battery
   Battery_Val = .8;
   Battery_Per = 24 * Battery_Val;
   tft.fillRect(211, 5, Battery_Per, 12, BLACK);
+
   if (page == 0) {
     if (!ts.touched()) {
       WasTouched = 0;
@@ -244,20 +255,54 @@ void loop() {
       Serial.println(y);
       if ((x > 170 && x < 230) && (y > 2 && y < 50))
       {
-        if (page == 0 && JustSwitched == 0)
+        if (page == 0 && JustSwitchedPage == 0)
         {
           DrawSettingsPage();
           Serial.println(page);
-          Serial.println(JustSwitched);
+          Serial.println(JustSwitchedPage);
           Serial.println("S2");
 
         }
 
       }
+      //LEDCHECK
+      if ((x > 5 && x < 90) && (y > 100 && y < 150))
+      {
+        if (LED == 0 && JustSwitchedLED == 0) {
+          LED = 1;
+          JustSwitchedLED = 1;
+          DrawLEDHome();
+        }
+        if (LED == 1 && JustSwitchedLED == 0) {
+          LED = 0;
+          JustSwitchedLED = 1;
+          DrawLEDHome();
+        }
+
+
+        Serial.println(LED);
+      }
+      //BUZZCHECK
+      if ((x > 5 && x < 90) && (y > 56 && y < 97))
+      {
+        if (BUZZER == 0 && JustSwitchedBuzzer == 0) {
+          BUZZER = 1;
+          JustSwitchedBuzzer = 1;
+          DrawBuzzerHome();
+        }
+        if (BUZZER == 1 && JustSwitchedBuzzer == 0) {
+          BUZZER = 0;
+          JustSwitchedBuzzer = 1;
+          DrawBuzzerHome();
+        }
+        Serial.println(BUZZER);
+        Serial.println(LED);
+      }
     }
-
-
+    //END OF PAGE0
   }
+
+
   if (page == 1) {
     if (!ts.touched()) {
       WasTouched = 0;
@@ -274,20 +319,120 @@ void loop() {
       Serial.println(y);
       if ((x > 170 && x < 230) && (y > 15 && y < 50))
       {
-        if (page == 1 && JustSwitched == 0);
+        if (page == 1 && JustSwitchedPage == 0);
         {
           DrawHomePage();
           Serial.println(page);
-          Serial.println(JustSwitched);
+          Serial.println(JustSwitchedPage);
           Serial.println("S1");
         }
+      }
+    if ((x > 10 && x < 230) && ( y > 115 && y < 160)) {
+      if (page == 1 && JustSwitchedPage == 0) {
+        DrawAlertThreshSet();
+      }
+    }
+      if ((x > 10 && x < 230) && ( y > 190 && y < 210))
+      {
+        if (page == 1 && JustSwitchedPage == 0) {
+          DrawUnitsSettings();
+        }
+      }
+            if((x>10 && x<230) && ( y>60 && y<105)){
+              DrawCalibrationSettings();
+            }
+
+    }
+  }
+
+if (page == 2) {
+  if (!ts.touched()) {
+    WasTouched = 0;
+  }
+  if (ts.touched() && !WasTouched)
+  {
+    WasTouched = 1;
+    TS_Point p = ts.getPoint();
+    x = map(p.x, TS_MINX, TS_MAXX, 240, 0);
+    y = map(p.y, TS_MINY, TS_MAXY, 320, 0);
+    Serial.print(", x = ");
+    Serial.print(x);
+    Serial.print(", y = ");
+    Serial.println(y);
+          if ((x > 10 && x < 230) && ( y > 190 && y < 210))
+      {
+        if (page == 2 && JustSwitchedPage == 0) {
+          if(DoseUnit==1){
+            DoseUnit=0;
+            DrawUnitsOptions();
+          }
+        }
+      }
+    if ((x > 170 && x < 230) && (y > 15 && y < 50))
+    {
+      if (page == 2 && JustSwitchedPage == 0);
+      {
+        DrawSettingsPage();
+      }
+    }
+    
+    if ((x > 10 && x < 230) && ( y > 115 && y < 160)) {
+      if (page == 2 && JustSwitchedPage == 0) {
+      if(DoseUnit==0){
+        DoseUnit=1;
+        DrawUnitsOptions();
+        
+      }
 
       }
     }
-
-
   }
+
 }
+if (page == 3) {
+  tft.setCursor(132,175);
+  tft.println(AlertVal);
+  if (!ts.touched()) {
+    WasTouched = 0;
+  }
+  if (ts.touched() && !WasTouched)
+  {
+    WasTouched = 1;
+    TS_Point p = ts.getPoint();
+    x = map(p.x, TS_MINX, TS_MAXX, 240, 0);
+    y = map(p.y, TS_MINY, TS_MAXY, 320, 0);
+    Serial.print(", x = ");
+    Serial.print(x);
+    Serial.print(", y = ");
+    Serial.println(y);
+    if ((x > 170 && x < 230) && (y > 15 && y < 50))
+    {
+      if (page == 3 && JustSwitchedPage == 0);
+      {
+        DrawSettingsPage();
+      }
+    }
+    
+    if ((x > 85 && x < 122) && ( y > 178 && y < 210)) {
+      if (page == 3 && JustSwitchedPage == 0) {
+      AlertVal=AlertVal+1;
+        tft.fillRect(120,136,40,40,BLACK);
+
+        Serial.println( " plus");
+      }
+      }
+    if ((x > 80 && x < 122) && ( y > 70 && y < 84)) {
+      AlertVal=AlertVal-1;
+        tft.fillRect(120,136,40,40,BLACK);
+
+        Serial.println("minus");
+    }
+  }
+
+
+}
+}
+
 
 
 
@@ -295,11 +440,26 @@ void loop() {
 
 void DrawHomePage() {
   page = 0;
-  JustSwitched = 1;
+  JustSwitchedPage = 1;
   tft.setFont();
   //DOSERATE
   tft.fillScreen(ILI9341_BLACK);
+  DrawBattery();
+  DrawDoseHome();
+  DrawBackgroundHome();
+  DrawCumulativeDose();
+  DrawBuzzerHome();
+  DrawLEDHome();
+  DrawTimedCount();
+  DrawIntTime();
+  //SETTINGS
+  tft.fillRect(2, 263, 59, 59, GREEN);
+  tft.drawBitmap(1, 264, settingsBitmap, 58, 58, ILI9341_WHITE);
+}
 
+
+void DrawBattery() {
+  tft.setFont();
   tft.fillRect(0, 0, 240, 23, BLACK);
   tft.drawRect(210, 4, 26, 14, ILI9341_WHITE);
   tft.drawLine(209, 8, 209, 13, ILI9341_WHITE); // Battery symbol
@@ -309,6 +469,18 @@ void DrawHomePage() {
   tft.setTextColor(YELLOW);
   tft.setTextSize(1);
   tft.println("rm2020");
+}
+void DrawBuzzerHome() {
+  //BUZZER
+  tft.fillRect(153, 210, 84, 50, RED);
+  if (BUZZER == 1) {
+    tft.drawBitmap(173, 214, buzzerOnBitmap, 45, 45, ILI9341_WHITE);
+  }
+  if (BUZZER == 0) {
+    tft.drawBitmap(173, 214, buzzerOffBitmap, 45, 45, ILI9341_WHITE);
+  }
+}
+void DrawDoseHome() {
 
   tft.fillRect(0, 27, 240, 80, BLUE);
   tft.setCursor(6, 47);
@@ -322,9 +494,11 @@ void DrawHomePage() {
     tft.println(" uS/h");
   }
   else if (DoseUnit == 1) {
-    tft.println(" rem/h");
+    tft.println(" mRem/h");
   }
-  //NORMAL BACKGROUND
+}
+
+void DrawBackgroundHome() {
   tft.fillRect(0, 110, 240, 40, GREEN);
   tft.setTextColor(BLACK);
   tft.setCursor(20, 120);
@@ -339,25 +513,19 @@ void DrawHomePage() {
   else if (CountUnit == 1) {
     tft.println(" CPS");
   }
-  //CUMULATIVEDOSE
-  tft.fillRect(0, 190, 150, 70, MAGENTA);
-  tft.setCursor(5, 205);
-  tft.setTextSize(0);
-  tft.setFont(&FreeSans9pt7b);
-  tft.println("Cumulative Dose");
-  tft.print(CumuDose);
-  tft.println(" CPM");
-  tft.print(CumuRate);
-  tft.println(" uSv/H");
+}
+void DrawLEDHome() {
   //LED
   tft.fillRect(153, 153, 84, 54, BLUE);
-  tft.drawBitmap(173, 157, ledOnBitmap, 45, 45, ILI9341_WHITE);
-  //BUZZER
-  tft.fillRect(153, 210, 84, 50, RED);
-  tft.drawBitmap(173, 214, buzzerOnBitmap, 45, 45, ILI9341_WHITE);
-  //SETTINGS
-  tft.fillRect(2, 263, 59, 59, GREEN);
-  tft.drawBitmap(1, 264, settingsBitmap, 58, 58, ILI9341_WHITE);
+  if (LED == 1) {
+    tft.drawBitmap(173, 157, ledOnBitmap, 45, 45, ILI9341_WHITE);
+    Serial.println("LEDON");
+  }
+  if (LED == 0) {
+    tft.drawBitmap(173, 157, ledOffBitmap, 45, 45, ILI9341_WHITE);
+  }
+}
+void DrawTimedCount() {
   //TO GO TO TIMED COUNT
   tft.fillRect(64, 263, 86, 59, GREEN);
   tft.setCursor(82, 285);
@@ -365,6 +533,8 @@ void DrawHomePage() {
   tft.println("Timed");
   tft.setCursor(83, 305);
   tft.println("Count");
+}
+void DrawIntTime() {
   //INT TIME
   tft.fillRect(153, 263, 84, 59, GREEN);
   tft.setCursor(179, 290);
@@ -375,12 +545,124 @@ void DrawHomePage() {
   tft.println(" s");
 }
 
+void DrawCumulativeDose() {
+  //CUMULATIVEDOSE
+  tft.fillRect(0, 190, 150, 70, MAGENTA);
+  tft.setCursor(5, 205);
+  tft.setTextSize(0);
+  tft.setFont(&FreeSans9pt7b);
+  tft.println("Cumulative Dose");
+  tft.print(CumuDose);
+  tft.println(" CPM");
+  tft.print(CumuRate);
+if(DoseUnit==0){
+  tft.println(" uSv/H");
+}
+if(DoseUnit==1){
+  tft.println(" mRem/h");
+}
+}
+
+void DrawBackButton() {
+  tft.fillRect(3, 276, 65, 40, GREEN);
+  tft.drawBitmap(3, 273, BackBitmap, 62, 45, WHITE);
+}
+void DrawSettingNeeds() {
+  tft.fillScreen(BLACK);
+  DrawBattery();
+  DrawBackButton();
+  tft.fillRect(03, 30, 234, 50, BLUE);
+
+}
+
 void DrawSettingsPage() {
   page = 1;
-  JustSwitched = 1;
-  tft.fillScreen(BLACK);
-  //    tft.fillRect(200, 200, 100, 100, BLUE);
-  tft.fillRect(3, 276, 65, 40, GREEN);
+  JustSwitchedPage = 1;
+  DrawSettingNeeds();
+  tft.fillRect(03, 86, 234, 50, GREEN);
+  tft.fillRect(03, 142, 234, 50, GREEN);
+  tft.fillRect(03, 198, 234, 50, GREEN);
+
+  tft.setCursor(55, 57);
   tft.setFont(&FreeSans12pt7b);
-  tft.drawBitmap(3, 273, BackBitmap, 62, 45, WHITE);
+  tft.setTextColor(YELLOW);
+  tft.println("SETTINGS");
+
+  tft.setTextColor(BLACK);
+  tft.setCursor(55, 120);
+  tft.println("DOSE UNIT");
+
+  tft.setCursor(5, 175);
+  tft.println("ALERT THRESHOLD");
+
+  tft.setCursor(38, 230);
+  tft.println("CALIBRATION");
+}
+
+void DrawUnitsSettings() {
+  page = 2;
+  JustSwitchedPage = 1;
+  DrawSettingNeeds();
+  tft.setCursor(80, 57);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setTextColor(YELLOW);
+  tft.println("UNITS");
+  DrawUnitsOptions();
+
+}
+
+void DrawUnitsOptions() {
+  if (DoseUnit == 0) {
+    tft.fillRect(03, 86, 234, 50, GREEN);
+    tft.fillRect(03, 142, 234, 50, RED);
+  }
+  if (DoseUnit == 1) {
+    tft.fillRect(03, 86, 234, 50, RED);
+    tft.fillRect(03, 142, 234, 50, GREEN);
+  }
+  tft.setTextColor(BLACK);
+  tft.setCursor(45, 120);
+  tft.println("Sieverts (uSv/h)");
+  tft.setCursor(55, 175);
+  tft.println("Rems (mR/h)");
+}
+
+void DrawAlertThreshSet(){
+  page=3;
+  DrawSettingNeeds();
+  tft.setCursor(5, 57);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setTextColor(YELLOW);
+  tft.println("ALERT THRESHOLD");
+  tft.setCursor(5,175);
+  if(DoseUnit=0){
+    tft.println("uSv/hr:");
+  }
+  if(DoseUnit=1){
+    tft.println("mRem/hr:");
+  }
+  tft.fillRect(120,86,40,40,GREEN);
+  tft.fillRect(120,206,40,40,GREEN);
+
+tft.fillRect(138,96,4,20,WHITE);
+tft.fillRect(131,104,20,4,WHITE);
+tft.fillRect(131,224,20,4,WHITE);
+}
+
+void DrawCalibrationSettings(){
+    page=4;
+  DrawSettingNeeds();
+  tft.setCursor(5, 57);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setTextColor(YELLOW);
+  tft.println("CALIBRATION");
+  tft.setCursor(5,175);
+    tft.println("Conversion Factor (CPM per uSv/h_");
+
+  tft.fillRect(120,86,40,40,GREEN);
+  tft.fillRect(120,206,40,40,GREEN);
+
+tft.fillRect(138,96,4,20,WHITE);
+tft.fillRect(131,104,20,4,WHITE);
+tft.fillRect(131,224,20,4,WHITE);
 }
