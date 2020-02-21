@@ -5,6 +5,7 @@
 #include <XPT2046_Touchscreen.h>
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
+#include <EEPROM.h>
 
 #define CS_PIN D2
 XPT2046_Touchscreen ts(CS_PIN);
@@ -31,19 +32,28 @@ int WasTouched;
 int x, y;
 int page = 0;
 float DoseRate = .01;
-int DoseUnit = 0;
+int DoseUnit;
 int Counts = 60;
-int CountUnit = 0;
+int CountUnit;
 int CumuRate = 60;
 float CumuDose = .01;
-int IntTime = 60;
+int IntOption;
+int IntTime = 0;
 int JustSwitchedPage = 0;
 int JustSwitchedLED = 0;
 int JustSwitchedBuzzer = 0;
 int LED;
 int BUZZER;
 int Updated;
-int AlertVal=5;
+int AlertVal;
+int CalibrationVal;
+
+//EEPROM ADDRESSES
+const int DoseUnitsAdd =0;
+const int AlertThreshAdd = 1;
+const int CalValAdd =2;
+
+
 
 const unsigned char gammaBitmap [] PROGMEM = {
   0x30, 0x00, 0x78, 0x70, 0xe8, 0xe0, 0xc4, 0xe0, 0x84, 0xc0, 0x05, 0xc0, 0x05, 0x80, 0x07, 0x80,
@@ -203,6 +213,9 @@ const unsigned char BackBitmap [] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+long EEPROMReadlong(long address);
+void EEPROMWritelong(int address, long value); // logging functions
+
 void setup() {
   Serial.begin(115200);
   ts.begin();
@@ -210,13 +223,22 @@ void setup() {
   tft.begin();
   tft.setRotation(2);
   tft.fillScreen(ILI9341_BLACK);
-
+ EEPROM.begin(4096);
   //    tft.setFont(&FreeSans9pt7b);
   //  DrawHomePage();
   //DrawSettingsPage();
   //DrawUnitsSettings();
-  DrawAlertThreshSet();
+//  DrawAlertThreshSet();
+  DrawCalibrationSettings();
+
+
+
+  DoseUnit = EEPROM.read(DoseUnitsAdd);
+  AlertVal = EEPROM.read(AlertThreshAdd);
+  CalibrationVal = EEPROM.read(CalValAdd);
+  //addr = EEPROMReadlong(96);
 }
+
 
 
 
@@ -261,9 +283,7 @@ void loop() {
           Serial.println(page);
           Serial.println(JustSwitchedPage);
           Serial.println("S2");
-
         }
-
       }
       //LEDCHECK
       if ((x > 5 && x < 90) && (y > 100 && y < 150))
@@ -278,13 +298,29 @@ void loop() {
           JustSwitchedLED = 1;
           DrawLEDHome();
         }
-
-
-        Serial.println(LED);
       }
+    if ((x>85 && x<165) && (y>5&&y<40)){
+      Serial.println("TIMEDCOUNT");
+    }
+//    if(({x > 5 && x < 89) && (y > 5&& y < 40)){
+//      if(IntOption=0){
+//        IntOption=1;
+//      }
+//     if(IntOption=1){
+//        IntOption=2;
+//      }
+//            if(IntOption=2){
+//        IntOption=3;
+//      }
+//            if(IntOption=4){
+//        IntOption=5;
+//      }
+//            if(IntOption=5){
+//        IntOption=0;
+//      
+      
       //BUZZCHECK
-      if ((x > 5 && x < 90) && (y > 56 && y < 97))
-      {
+      if ((x > 5 && x < 85) && (y > 56 && y < 97))
         if (BUZZER == 0 && JustSwitchedBuzzer == 0) {
           BUZZER = 1;
           JustSwitchedBuzzer = 1;
@@ -298,7 +334,7 @@ void loop() {
         Serial.println(BUZZER);
         Serial.println(LED);
       }
-    }
+
     //END OF PAGE0
   }
 
@@ -372,7 +408,12 @@ if (page == 2) {
     {
       if (page == 2 && JustSwitchedPage == 0);
       {
+        if (EEPROM.read(DoseUnitsAdd) != DoseUnit){
+          EEPROM.write(DoseUnitsAdd, DoseUnit);
+          EEPROM.commit();
+        }
         DrawSettingsPage();
+        
       }
     }
     
@@ -409,6 +450,10 @@ if (page == 3) {
     {
       if (page == 3 && JustSwitchedPage == 0);
       {
+         if (EEPROM.read(AlertThreshAdd) != AlertVal){
+          EEPROM.write(AlertThreshAdd, AlertVal);
+          EEPROM.commit();
+        }
         DrawSettingsPage();
       }
     }
@@ -428,10 +473,56 @@ if (page == 3) {
         Serial.println("minus");
     }
   }
+}
 
+if (page == 4) {
+  tft.setFont(&FreeSans12pt7b);
+  tft.setCursor(170,175);
+  tft.println(CalibrationVal);
+  if (!ts.touched()) {
+    WasTouched = 0;
+  }
+  if (ts.touched() && !WasTouched)
+  {
+    WasTouched = 1;
+    TS_Point p = ts.getPoint();
+    x = map(p.x, TS_MINX, TS_MAXX, 240, 0);
+    y = map(p.y, TS_MINY, TS_MAXY, 320, 0);
+    Serial.print(", x = ");
+    Serial.print(x);
+    Serial.print(", y = ");
+    Serial.println(y);
+    if ((x > 170 && x < 230) && (y > 15 && y < 50))
+    {
+      if (page == 4 && JustSwitchedPage == 0);
+      {
+      if (EEPROM.read(CalValAdd) != CalibrationVal){
+          EEPROM.write(CalValAdd, CalibrationVal);
+          EEPROM.commit();
+        }
+        DrawSettingsPage();
+      }
+    }
+    
+    if ((x > 35 && x < 70) && ( y > 178 && y < 215)) {
+      CalibrationVal=CalibrationVal+1;
+        tft.fillRect(160,136,40,40,BLACK);
 
+        Serial.println( " plus");
+      
+      }
+    if ((x > 35 && x < 70) && ( y > 60 && y < 88)) {
+      CalibrationVal=CalibrationVal-1;
+        tft.fillRect(160,136,40,40,BLACK);
+
+        Serial.println("minus");
+    }
+  }
 }
 }
+
+
+
 
 
 
@@ -635,10 +726,10 @@ void DrawAlertThreshSet(){
   tft.setTextColor(YELLOW);
   tft.println("ALERT THRESHOLD");
   tft.setCursor(5,175);
-  if(DoseUnit=0){
+  if(DoseUnit==0){
     tft.println("uSv/hr:");
   }
-  if(DoseUnit=1){
+  if(DoseUnit==1){
     tft.println("mRem/hr:");
   }
   tft.fillRect(120,86,40,40,GREEN);
@@ -656,13 +747,37 @@ void DrawCalibrationSettings(){
   tft.setFont(&FreeSans12pt7b);
   tft.setTextColor(YELLOW);
   tft.println("CALIBRATION");
-  tft.setCursor(5,175);
-    tft.println("Conversion Factor (CPM per uSv/h_");
+  tft.setCursor(5,165);
+tft.setFont(&FreeSans9pt7b);
+    tft.println("Conversion Factor");
+    tft.setCursor(5,180);
+    tft.println("(CPM per uSv/h)");
+tft.setFont();
+  tft.fillRect(165,86,40,40,GREEN);
+  tft.fillRect(165,206,40,40,GREEN);
 
-  tft.fillRect(120,86,40,40,GREEN);
-  tft.fillRect(120,206,40,40,GREEN);
+tft.fillRect(182,96,4,20,WHITE);
+tft.fillRect(176,104,20,4,WHITE);
+tft.fillRect(176,224,20,4,WHITE);
+}
 
-tft.fillRect(138,96,4,20,WHITE);
-tft.fillRect(131,104,20,4,WHITE);
-tft.fillRect(131,224,20,4,WHITE);
+long EEPROMReadlong(long address) {
+  long four = EEPROM.read(address);
+  long three = EEPROM.read(address + 1);
+  long two = EEPROM.read(address + 2);
+  long one = EEPROM.read(address + 3);
+ 
+  return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
+}
+
+void EEPROMWritelong(int address, long value) {
+  byte four = (value & 0xFF);
+  byte three = ((value >> 8) & 0xFF);
+  byte two = ((value >> 16) & 0xFF);
+  byte one = ((value >> 24) & 0xFF);
+ 
+  EEPROM.write(address, four);
+  EEPROM.write(address + 1, three);
+  EEPROM.write(address + 2, two);
+  EEPROM.write(address + 3, one);
 }
