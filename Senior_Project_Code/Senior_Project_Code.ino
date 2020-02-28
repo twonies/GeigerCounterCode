@@ -38,7 +38,7 @@ int CountUnit;
 int CumuRate = 60;
 float CumuDose = .01;
 int IntOption;
-int IntTime = 0;
+int IntTime = 5;
 int JustSwitchedPage = 0;
 int JustSwitchedLED = 0;
 int JustSwitchedBuzzer = 0;
@@ -47,12 +47,18 @@ int BUZZER;
 int Updated;
 int AlertVal;
 int CalibrationVal;
-
+int TimedCountVal;
+int BatteryIn;
+float BatteryPer;
+int BatteryUpdate;
+int BatteryUpdateCounter = 29;
+float BatteryVal;
+float Battery_Per;
 //EEPROM ADDRESSES
 const int DoseUnitsAdd =0;
 const int AlertThreshAdd = 1;
 const int CalValAdd =2;
-
+int JustSwitchedITime;
 
 
 const unsigned char gammaBitmap [] PROGMEM = {
@@ -218,6 +224,7 @@ void EEPROMWritelong(int address, long value); // logging functions
 
 void setup() {
   Serial.begin(115200);
+
   ts.begin();
   ts.setRotation(2);
   tft.begin();
@@ -226,23 +233,41 @@ void setup() {
  EEPROM.begin(4096);
   //    tft.setFont(&FreeSans9pt7b);
   //  DrawHomePage();
+     pinMode(D3, OUTPUT);
+       digitalWrite(D3, LOW);
   //DrawSettingsPage();
   //DrawUnitsSettings();
 //  DrawAlertThreshSet();
-  DrawCalibrationSettings();
-
-
-
+//  DrawCalibrationSettings();
+ // DrawTimedCountPage();
+  DrawCountingPage();
   DoseUnit = EEPROM.read(DoseUnitsAdd);
   AlertVal = EEPROM.read(AlertThreshAdd);
   CalibrationVal = EEPROM.read(CalValAdd);
-  //addr = EEPROMReadlong(96);
 }
 
 
 
 
 void loop() {
+    BatteryUpdateCounter ++;
+  if (BatteryUpdateCounter == 30){
+    BatteryIn=analogRead(A0);
+    Serial.print("Battery: ");
+    Serial.println(BatteryIn);
+    BatteryIn=constrain(BatteryIn, 590,800);
+ //   Serial.print("Battery2: ");
+ //   Serial.println(BatteryIn);
+    BatteryPer = map(BatteryIn,590,800,100,0);
+    BatteryVal = BatteryPer/100;
+ //       Serial.print("BatteryVal: ");
+ //   Serial.println(BatteryVal);
+  Battery_Per = 24 * BatteryVal;
+  tft.fillRect(211, 5, Battery_Per, 12, BLACK);
+  BatteryUpdateCounter=0;
+ //     Serial.print("BatteryPer: ");
+ //   Serial.println(Battery_Per);
+  }
   int X_Coord;
   int Y_Coord;
   float Battery_Val;
@@ -257,9 +282,7 @@ void loop() {
     JustSwitchedBuzzer = 0;
   }
   //battery
-  Battery_Val = .8;
-  Battery_Per = 24 * Battery_Val;
-  tft.fillRect(211, 5, Battery_Per, 12, BLACK);
+
 
   if (page == 0) {
     if (!ts.touched()) {
@@ -299,28 +322,47 @@ void loop() {
           DrawLEDHome();
         }
       }
+      if (LED==1){
+          digitalWrite(D3, HIGH);
+      }
+      if(LED==0){
+          digitalWrite(D3, LOW);
+      }
     if ((x>85 && x<165) && (y>5&&y<40)){
       Serial.println("TIMEDCOUNT");
     }
-//    if(({x > 5 && x < 89) && (y > 5&& y < 40)){
-//      if(IntOption=0){
-//        IntOption=1;
-//      }
-//     if(IntOption=1){
-//        IntOption=2;
-//      }
-//            if(IntOption=2){
-//        IntOption=3;
-//      }
-//            if(IntOption=4){
-//        IntOption=5;
-//      }
-//            if(IntOption=5){
-//        IntOption=0;
-//      
+    if((x > 5 && x < 89) && (y > 5&& y < 40)){
+      if(IntTime==5 && JustSwitchedITime == 0){
+        IntTime=15;
+        JustSwitchedITime=1;
+        DrawIntTime();
+      }
+     if(IntTime==15 && JustSwitchedITime == 0){
+        IntTime=30;
+        JustSwitchedITime=1;
+        DrawIntTime();
+      }
+            if(IntTime==30 && JustSwitchedITime == 0){
+        IntTime=60;
+        JustSwitchedITime=1;
+        DrawIntTime();
+      }
+            if(IntTime==60 && JustSwitchedITime == 0){
+        IntTime=120;
+        JustSwitchedITime=1;
+        DrawIntTime();
+      }
+            if(IntTime==120 && JustSwitchedITime == 0){
+        IntTime=5;
+        JustSwitchedITime=1;
+        DrawIntTime();
+            }
+            JustSwitchedITime=0;
+    }
+      
       
       //BUZZCHECK
-      if ((x > 5 && x < 85) && (y > 56 && y < 97))
+      if ((x > 5 && x < 85) && (y > 56 && y < 97)){
         if (BUZZER == 0 && JustSwitchedBuzzer == 0) {
           BUZZER = 1;
           JustSwitchedBuzzer = 1;
@@ -334,9 +376,10 @@ void loop() {
         Serial.println(BUZZER);
         Serial.println(LED);
       }
-
+    }
     //END OF PAGE0
   }
+ 
 
 
   if (page == 1) {
@@ -519,8 +562,54 @@ if (page == 4) {
     }
   }
 }
+if(page==5){
+  tft.setFont(&FreeSans12pt7b);
+  tft.setCursor(170,175);
+  tft.println(TimedCountVal);
+    if (!ts.touched()) {
+    WasTouched = 0;
+  }
+  if (ts.touched() && !WasTouched)
+  {
+    WasTouched = 1;
+    TS_Point p = ts.getPoint();
+    x = map(p.x, TS_MINX, TS_MAXX, 240, 0);
+    y = map(p.y, TS_MINY, TS_MAXY, 320, 0);
+    Serial.print(", x = ");
+    Serial.print(x);
+    Serial.print(", y = ");
+    Serial.println(y);
+    if ((x > 170 && x < 230) && (y > 15 && y < 50))
+    {
+      if (page == 5 && JustSwitchedPage == 0);
+      {
+        DrawSettingsPage();
+      }
+    }
+    
+    if ((x > 35 && x < 70) && ( y > 178 && y < 215)) {
+      TimedCountVal=TimedCountVal+1;
+        tft.fillRect(160,136,40,40,BLACK);
+
+        Serial.println( " plus");
+      
+      }
+    if ((x > 35 && x < 70) && ( y > 60 && y < 88)) {
+      TimedCountVal=TimedCountVal-1;
+        tft.fillRect(160,136,40,40,BLACK);
+
+        Serial.println("minus");
+    }
+  }
 }
 
+
+
+
+
+
+
+}
 
 
 
@@ -551,7 +640,8 @@ void DrawHomePage() {
 
 void DrawBattery() {
   tft.setFont();
-  tft.fillRect(0, 0, 240, 23, BLACK);
+  tft.fillRect(0,0,240,23, WHITE);
+  tft.fillRect(1, 1, 238, 21, BLACK);
   tft.drawRect(210, 4, 26, 14, ILI9341_WHITE);
   tft.drawLine(209, 8, 209, 13, ILI9341_WHITE); // Battery symbol
   tft.drawLine(208, 8, 208, 13, ILI9341_WHITE);
@@ -662,8 +752,7 @@ void DrawSettingNeeds() {
   tft.fillScreen(BLACK);
   DrawBattery();
   DrawBackButton();
-  tft.fillRect(03, 30, 234, 50, BLUE);
-
+  tft.fillRect(0, 23, 240, 50, BLUE);
 }
 
 void DrawSettingsPage() {
@@ -674,7 +763,7 @@ void DrawSettingsPage() {
   tft.fillRect(03, 142, 234, 50, GREEN);
   tft.fillRect(03, 198, 234, 50, GREEN);
 
-  tft.setCursor(55, 57);
+  tft.setCursor(55, 50);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextColor(YELLOW);
   tft.println("SETTINGS");
@@ -694,7 +783,7 @@ void DrawUnitsSettings() {
   page = 2;
   JustSwitchedPage = 1;
   DrawSettingNeeds();
-  tft.setCursor(80, 57);
+  tft.setCursor(80, 50);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextColor(YELLOW);
   tft.println("UNITS");
@@ -721,7 +810,7 @@ void DrawUnitsOptions() {
 void DrawAlertThreshSet(){
   page=3;
   DrawSettingNeeds();
-  tft.setCursor(5, 57);
+  tft.setCursor(5, 50);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextColor(YELLOW);
   tft.println("ALERT THRESHOLD");
@@ -743,7 +832,7 @@ tft.fillRect(131,224,20,4,WHITE);
 void DrawCalibrationSettings(){
     page=4;
   DrawSettingNeeds();
-  tft.setCursor(5, 57);
+  tft.setCursor(5, 50);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextColor(YELLOW);
   tft.println("CALIBRATION");
@@ -759,6 +848,53 @@ tft.setFont();
 tft.fillRect(182,96,4,20,WHITE);
 tft.fillRect(176,104,20,4,WHITE);
 tft.fillRect(176,224,20,4,WHITE);
+}
+void DrawTimedCountPage(){
+  page=5;
+  DrawSettingNeeds();
+  tft.setCursor(40, 50);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setTextColor(YELLOW);
+  tft.println("TIMED COUNT");
+    tft.setCursor(5,175);
+  tft.setFont(&FreeSans9pt7b);
+    tft.println("Duration (Minutes)");
+
+  tft.fillRect(165,86,40,40,GREEN);
+  tft.fillRect(165,206,40,40,GREEN);
+  tft.fillRect(182,96,4,20,WHITE);
+  tft.fillRect(176,104,20,4,WHITE);
+  tft.fillRect(176,224,20,4,WHITE);
+  tft.fillRect(172, 276, 65, 40, GREEN);
+  tft.setCursor(177,302);
+  tft.setTextColor(WHITE);
+  tft.println("BEGIN");
+    tft.setFont();
+    tft.setTextColor(YELLOW);
+}
+
+void DrawCountingPage(){
+    page=6;
+      tft.fillScreen(BLACK);
+  DrawBattery();
+  tft.fillRect(0, 23, 240, 50, BLUE);
+  tft.setCursor(40, 50);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setTextColor(YELLOW);
+  tft.println("TIMED COUNT");
+
+tft.setCursor(70,100);
+tft.println("Progress");
+
+
+  tft.fillRect(165,206,40,40,GREEN);
+  tft.fillRect(172, 276, 65, 40, GREEN);
+  tft.setCursor(177,302);
+  tft.fillRect(15,115,210,35,GREEN);
+    tft.drawRect(15,115, 210, 35, ILI9341_WHITE);
+tft.setCursor(75,180);
+
+tft.println("Duration");
 }
 
 long EEPROMReadlong(long address) {
