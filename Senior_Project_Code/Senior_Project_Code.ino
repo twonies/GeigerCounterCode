@@ -59,8 +59,9 @@ const int DoseUnitsAdd =0;
 const int AlertThreshAdd = 1;
 const int CalValAdd =2;
 int JustSwitchedITime;
-
-
+float CountingPer;
+float ProgCountVal;
+int StartCountVal;
 const unsigned char gammaBitmap [] PROGMEM = {
   0x30, 0x00, 0x78, 0x70, 0xe8, 0xe0, 0xc4, 0xe0, 0x84, 0xc0, 0x05, 0xc0, 0x05, 0x80, 0x07, 0x80,
   0x03, 0x00, 0x07, 0x00, 0x0e, 0x00, 0x0e, 0x00, 0x1e, 0x00, 0x1e, 0x00, 0x1e, 0x00, 0x3e, 0x00,
@@ -221,6 +222,15 @@ const unsigned char BackBitmap [] PROGMEM = {
 
 long EEPROMReadlong(long address);
 void EEPROMWritelong(int address, long value); // logging functions
+unsigned long StartMillis;
+unsigned long IntervalMillis;
+unsigned long ElapsedTime;
+unsigned long ConvertedVal;
+unsigned long CurrentTime;
+float CPM;
+float PerCountVal;
+int CompletedCount;
+
 
 void setup() {
   Serial.begin(115200);
@@ -232,7 +242,7 @@ void setup() {
   tft.fillScreen(ILI9341_BLACK);
  EEPROM.begin(4096);
   //    tft.setFont(&FreeSans9pt7b);
-  //  DrawHomePage();
+    DrawHomePage();
      pinMode(D3, OUTPUT);
        digitalWrite(D3, LOW);
   //DrawSettingsPage();
@@ -250,11 +260,12 @@ void setup() {
 
 
 void loop() {
+    CurrentTime=millis();
     BatteryUpdateCounter ++;
   if (BatteryUpdateCounter == 30){
     BatteryIn=analogRead(A0);
-    Serial.print("Battery: ");
-    Serial.println(BatteryIn);
+//    Serial.print("Battery: ");
+//    Serial.println(BatteryIn);
     BatteryIn=constrain(BatteryIn, 590,800);
  //   Serial.print("Battery2: ");
  //   Serial.println(BatteryIn);
@@ -579,6 +590,15 @@ if(page==5){
     Serial.print(x);
     Serial.print(", y = ");
     Serial.println(y);
+    if ((x > 4 && x < 66) && (y > 0 && y < 40))
+    {
+      if (page == 5 && JustSwitchedPage == 0);
+      {
+       StartCountVal=1;
+        DrawCountingPage();
+      }
+    }
+    
     if ((x > 170 && x < 230) && (y > 15 && y < 50))
     {
       if (page == 5 && JustSwitchedPage == 0);
@@ -602,7 +622,50 @@ if(page==5){
     }
   }
 }
+if(page==6){
 
+  Serial.print("StartMillis: ");
+  Serial.println(StartMillis);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setCursor(170,180);
+  tft.println(TimedCountVal);
+  ConvertedVal=TimedCountVal;
+  ConvertedVal=ConvertedVal*60000;
+  Serial.print("ConvertedVal: ");
+  Serial.println(ConvertedVal);
+  PerCountVal =  PerCountVal=StartMillis;
+PerCountVal = PerCountVal/ConvertedVal;
+  Serial.print("PerCountVal: ");
+  Serial.println(PerCountVal);
+DrawCountingRefresh();
+  if (PerCountVal==1){
+tft.fillRect(72, 266, 95, 50, GREEN);
+tft.println("Ok");
+StartCountVal=0;
+  }
+  
+    if (!ts.touched()) {
+    WasTouched = 0;
+  }
+  if (ts.touched() && !WasTouched)
+  {
+    WasTouched = 1;
+        TS_Point p = ts.getPoint();
+    x = map(p.x, TS_MINX, TS_MAXX, 240, 0);
+    y = map(p.y, TS_MINY, TS_MAXY, 320, 0);
+    Serial.print(", x = ");
+    Serial.print(x);
+    Serial.print(", y = ");
+    Serial.println(y);
+      if ((x > 70 && x < 170) && ( y > 0 && y < 44)) {
+       if (page == 6 && JustSwitchedPage == 0);
+      {
+        DrawTimedCountPage();
+      }
+      }
+      }
+
+    }
 
 
 
@@ -872,9 +935,12 @@ void DrawTimedCountPage(){
     tft.setFont();
     tft.setTextColor(YELLOW);
 }
-
+void DrawCountingRefresh(){
+    tft.fillRect(15,115,210*PerCountVal,35,GREEN);
+}
 void DrawCountingPage(){
     page=6;
+    DrawCountingRefresh();
       tft.fillScreen(BLACK);
   DrawBattery();
   tft.fillRect(0, 23, 240, 50, BLUE);
@@ -885,16 +951,19 @@ void DrawCountingPage(){
 
 tft.setCursor(70,100);
 tft.println("Progress");
+ProgCountVal=TimedCountVal;
 
 
-  tft.fillRect(165,206,40,40,GREEN);
-  tft.fillRect(172, 276, 65, 40, GREEN);
+//  tft.fillRect(165,206,40,40,GREEN);
   tft.setCursor(177,302);
-  tft.fillRect(15,115,210,35,GREEN);
-    tft.drawRect(15,115, 210, 35, ILI9341_WHITE);
-tft.setCursor(75,180);
-
+  tft.drawRect(15,115, 210, 35, ILI9341_WHITE);
+tft.setCursor(65,180);
 tft.println("Duration");
+tft.setCursor(83,296);
+  tft.setTextColor(BLACK);
+  tft.fillRect(72, 266, 95, 50, GREEN);
+tft.println("Cancel");
+  tft.setTextColor(YELLOW);
 }
 
 long EEPROMReadlong(long address) {
