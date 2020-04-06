@@ -24,19 +24,21 @@ Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
 #define MAGENTA 0xF81F
 #define YELLOW 0xFFE0
 #define WHITE 0xFFFF
-#define DOSEBACKGROUND 0x0455
+#define DoseBACKGROUND 0x0455
 int ColorPaletteHigh = 30; // Height of palette boxes
 int color = WHITE;     //Starting paint brush color
 unsigned int colors[10] = {RED, GREEN, BLUE, BLACK, CYAN, YELLOW, WHITE, MAGENTA, BLACK, BLACK};
 int WasTouched;
+unsigned long currentMicros;
+unsigned long previousMicros;
 int x, y;
+unsigned int previousIntMicros;
 int page = 0;
-float DoseRate = .01;
 int DoseUnit;
-int Counts = 60;
+int Counts;
 int CountUnit;
-int CumuRate = 60;
-float CumuDose = .01;
+int CumuRate;
+float CumuDose;
 int IntOption;
 int IntTime = 5;
 int JustSwitchedPage = 0;
@@ -55,13 +57,32 @@ int BatteryUpdateCounter = 29;
 float BatteryVal;
 float Battery_Per;
 //EEPROM ADDRESSES
-const int DoseUnitsAdd =0;
+unsigned int conversionFactor = 175;
+const int DoseUnitAdd =0;
 const int AlertThreshAdd = 1;
 const int CalValAdd =2;
 int JustSwitchedITime;
 float CountingPer;
 float ProgCountVal;
 int StartCountVal;
+unsigned long AvgCount;
+unsigned long CurCount;  // incremented by interrupt
+unsigned long PrevCount; // to activate buzzer and LED
+unsigned long CumuCount;
+const int interruptPin = 5;
+int integrationMode;
+long Count[61];
+long FastCount[6]; // arrays to store running Counts
+long SlowCount[181];
+int i = 0;         // array elements
+int j = 0;
+int k = 0;
+void ICACHE_RAM_ATTR isr();
+float DoseRate;
+float TotalDose;
+char Dose[5];
+int DoseLevel;               // determines home screen warning signs
+int PreviousDoseLevel;
 const unsigned char gammaBitmap [] PROGMEM = {
   0x30, 0x00, 0x78, 0x70, 0xe8, 0xe0, 0xc4, 0xe0, 0x84, 0xc0, 0x05, 0xc0, 0x05, 0x80, 0x07, 0x80,
   0x03, 0x00, 0x07, 0x00, 0x0e, 0x00, 0x0e, 0x00, 0x1e, 0x00, 0x1e, 0x00, 0x1e, 0x00, 0x3e, 0x00,
@@ -227,6 +248,7 @@ unsigned long IntervalMillis;
 unsigned long ElapsedTime;
 unsigned long ConvertedVal;
 unsigned long CurrentTime;
+unsigned long PreviousMillis;
 float CPM;
 float PerCountVal;
 int CompletedCount;
@@ -250,8 +272,9 @@ void setup() {
 //  DrawAlertThreshSet();
 //  DrawCalibrationSettings();
  // DrawTimedCountPage();
-  DrawCountingPage();
-  DoseUnit = EEPROM.read(DoseUnitsAdd);
+//  DrawCountingPage();
+  attachInterrupt(interruptPin, isr, FALLING);
+  DoseUnit = EEPROM.read(DoseUnitAdd);
   AlertVal = EEPROM.read(AlertThreshAdd);
   CalibrationVal = EEPROM.read(CalValAdd);
 }
@@ -296,6 +319,102 @@ void loop() {
 
 
   if (page == 0) {
+     if (CurrentTime - PreviousMillis >= 1000){
+            PreviousMillis = CurrentTime;
+         Count[i] = CurCount;
+      i++;
+      FastCount[j] = CurCount; // keep concurrent arrays of Counts. Use only one depending on user choice
+      j++;
+      SlowCount[k] = CurCount;
+      k++;
+
+      if (i == 61)
+      {
+        i = 0;
+      }
+
+      if (j == 6)
+      {
+        j = 0;
+      }
+
+      if (k == 181)
+      {
+        k = 0;
+      }
+
+      if (integrationMode == 2)
+      {
+        AvgCount = (CurCount - SlowCount[k]) / 3;
+      }
+
+      if (integrationMode == 1)
+      {
+        AvgCount = (CurCount - FastCount[j]) * 12;
+      }
+
+      else if (integrationMode == 0)
+      {
+        AvgCount = CurCount - Count[i]; // Count[i] stores the value from 60 seconds ago
+      }
+
+      AvgCount = ((AvgCount) / (1 - 0.00000333 * float(AvgCount))); // acCounts for dead time of the geiger tube. relevant at high Count rates
+
+      if (DoseUnit == 0)
+      {
+        DoseRate = AvgCount / float(conversionFactor);
+        TotalDose = CumuCount / (60 * float(conversionFactor));
+        
+      }
+      else if (DoseUnit == 1)
+      {
+        DoseRate = AvgCount / float(conversionFactor * 10.0);
+        TotalDose = CumuCount / (60 * float(conversionFactor * 10.0)); // 1 mRem == 10 uSv
+        
+      }
+
+      if (AvgCount < conversionFactor/2) // 0.5 uSv/hr
+        DoseLevel = 0; // determines alert level displayed on homescreen
+      else if (AvgCount < AlertVal * conversionFactor)
+        DoseLevel = 1;
+      else
+        DoseLevel = 2;
+
+      if (DoseRate < 10.0)
+      {
+        dtostrf(DoseRate, 4, 2, Dose); // display two digits after the decimal point if value is less than 10
+      }
+      else if ((DoseRate >= 10) && (DoseRate < 100))
+      {
+        dtostrf(DoseRate, 4, 1, Dose); // display one digit after decimal point when Dose is greater than 10
+      }
+      else if ((DoseRate >= 100))
+      {
+        dtostrf(DoseRate, 4, 0, Dose); // whole numbers only when Dose is higher than 100
+      }
+      else {
+        dtostrf(DoseRate, 4, 0, Dose);  // covers the rare edge case where the Dose rate is sometimes errorenously calculated to be negative
+      }
+         DrawDoseEffect();
+
+
+      Serial.println(CurCount);
+     }  // end of millis()-controlled block that runs once every second. The rest of the code on page 0 runs every loop
+    if (CurCount > PrevCount)
+    {
+      PrevCount = CurCount;
+      previousMicros = micros();
+    }
+    currentMicros = micros();
+    if (currentMicros - previousMicros >= 200)
+    {
+      digitalWrite(D3, LOW);
+      digitalWrite(D0, LOW);
+      previousMicros = currentMicros;
+    }
+
+  
+
     if (!ts.touched()) {
       WasTouched = 0;
     }
@@ -340,9 +459,31 @@ void loop() {
           digitalWrite(D3, LOW);
       }
     if ((x>85 && x<165) && (y>5&&y<40)){
-      Serial.println("TIMEDCOUNT");
-    }
+DrawTimedCountPage();    }
     if((x > 5 && x < 89) && (y > 5&& y < 40)){
+       integrationMode ++;
+        if (integrationMode == 3)
+        {
+          integrationMode = 0;
+        }
+        CurCount = 0;
+        PrevCount = 0;
+        for (int a = 0; a < 61; a++) // reset Counts when integretation speed is changed
+        {
+          Count[a] = 0;
+        }
+        for (int b = 0; b < 6; b++)
+        {
+          FastCount[b] = 0;
+        }
+        for (int c = 0; c < 181; c++)
+        {
+          SlowCount[c] = 0;
+        }
+        if (integrationMode == 3)
+        {
+          integrationMode = 0;
+        }
       if(IntTime==5 && JustSwitchedITime == 0){
         IntTime=15;
         JustSwitchedITime=1;
@@ -462,8 +603,8 @@ if (page == 2) {
     {
       if (page == 2 && JustSwitchedPage == 0);
       {
-        if (EEPROM.read(DoseUnitsAdd) != DoseUnit){
-          EEPROM.write(DoseUnitsAdd, DoseUnit);
+        if (EEPROM.read(DoseUnitAdd) != DoseUnit){
+          EEPROM.write(DoseUnitAdd, DoseUnit);
           EEPROM.commit();
         }
         DrawSettingsPage();
@@ -685,7 +826,7 @@ void DrawHomePage() {
   page = 0;
   JustSwitchedPage = 1;
   tft.setFont();
-  //DOSERATE
+  //DoseRATE
   tft.fillScreen(ILI9341_BLACK);
   DrawBattery();
   DrawDoseHome();
@@ -732,14 +873,22 @@ void DrawDoseHome() {
   tft.setTextSize(2);
   tft.println("Effective Dose Rate");
 
-  tft.setCursor(70, 70);
-  tft.print(DoseRate);
+  tft.setCursor(110, 70);
+//  tft.print(Dose);
   if (DoseUnit == 0) {
     tft.println(" uS/h");
   }
   else if (DoseUnit == 1) {
     tft.println(" mRem/h");
+    
   }
+}
+void DrawDoseEffect(){
+  tft.fillRect(60,60,60,30,BLUE);
+    tft.setCursor(65, 85);
+
+    tft.print(Dose);
+
 }
 
 void DrawBackgroundHome() {
@@ -747,10 +896,10 @@ void DrawBackgroundHome() {
   tft.setTextColor(BLACK);
   tft.setCursor(20, 120);
   tft.println("Normal Background");
-  //COUNTS
+  //CountS
   tft.fillRect(0, 153, 150, 35, CYAN);
   tft.setCursor(3, 162);
-  tft.print(Counts);
+  tft.print(CurCount);
   if (CountUnit == 0) {
     tft.println(" CPM");
   }
@@ -770,7 +919,7 @@ void DrawLEDHome() {
   }
 }
 void DrawTimedCount() {
-  //TO GO TO TIMED COUNT
+  //TO GO TO TIMED Count
   tft.fillRect(64, 263, 86, 59, GREEN);
   tft.setCursor(82, 285);
   tft.setTextColor(WHITE);
@@ -790,15 +939,15 @@ void DrawIntTime() {
 }
 
 void DrawCumulativeDose() {
-  //CUMULATIVEDOSE
+  //CUMULATIVEDose
   tft.fillRect(0, 190, 150, 70, MAGENTA);
   tft.setCursor(5, 205);
   tft.setTextSize(0);
   tft.setFont(&FreeSans9pt7b);
   tft.println("Cumulative Dose");
-  tft.print(CumuDose);
+  tft.print(Dose);
   tft.println(" CPM");
-  tft.print(CumuRate);
+  tft.print(Counts);
 if(DoseUnit==0){
   tft.println(" uSv/H");
 }
@@ -833,7 +982,7 @@ void DrawSettingsPage() {
 
   tft.setTextColor(BLACK);
   tft.setCursor(55, 120);
-  tft.println("DOSE UNIT");
+  tft.println("Dose UNIT");
 
   tft.setCursor(5, 175);
   tft.println("ALERT THRESHOLD");
@@ -918,7 +1067,7 @@ void DrawTimedCountPage(){
   tft.setCursor(40, 50);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextColor(YELLOW);
-  tft.println("TIMED COUNT");
+  tft.println("TIMED Count");
     tft.setCursor(5,175);
   tft.setFont(&FreeSans9pt7b);
     tft.println("Duration (Minutes)");
@@ -947,7 +1096,7 @@ void DrawCountingPage(){
   tft.setCursor(40, 50);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextColor(YELLOW);
-  tft.println("TIMED COUNT");
+  tft.println("TIMED Count");
 
 tft.setCursor(70,100);
 tft.println("Progress");
@@ -985,4 +1134,12 @@ void EEPROMWritelong(int address, long value) {
   EEPROM.write(address + 1, three);
   EEPROM.write(address + 2, two);
   EEPROM.write(address + 3, one);
+}
+void isr() // interrupt service routine
+{
+  if ((micros() - 200) > previousIntMicros){
+    CurCount++;
+    CumuCount++;
+  }
+  previousIntMicros = micros();
 }
