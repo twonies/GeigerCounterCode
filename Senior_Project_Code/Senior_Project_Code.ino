@@ -28,6 +28,8 @@ Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
 int ColorPaletteHigh = 30; // Height of palette boxes
 int color = WHITE;     //Starting paint brush color
 unsigned int colors[10] = {RED, GREEN, BLUE, BLACK, CYAN, YELLOW, WHITE, MAGENTA, BLACK, BLACK};
+unsigned int ColourBack;
+unsigned int ColourDose;
 int WasTouched;
 unsigned long currentMicros;
 unsigned long previousMicros;
@@ -56,6 +58,8 @@ int BatteryUpdate;
 int BatteryUpdateCounter = 29;
 float BatteryVal;
 float Battery_Per;
+
+char BackgroundText[30];
 //EEPROM ADDRESSES
 unsigned int conversionFactor = 175;
 const int DoseUnitAdd =0;
@@ -373,12 +377,17 @@ void loop() {
         
       }
 
-      if (AvgCount < conversionFactor/2) // 0.5 uSv/hr
+      if (AvgCount < conversionFactor/2) {
         DoseLevel = 0; // determines alert level displayed on homescreen
-      else if (AvgCount < AlertVal * conversionFactor)
+          AlertLevelCheck();
+     }
+      else if (AvgCount < AlertVal * conversionFactor){
         DoseLevel = 1;
+          AlertLevelCheck();
+      }
       else
-        DoseLevel = 2;
+      {
+        DoseLevel = 2;}
 
       if (DoseRate < 10.0)
       {
@@ -484,35 +493,9 @@ DrawTimedCountPage();    }
         {
           integrationMode = 0;
         }
-      if(IntTime==5 && JustSwitchedITime == 0){
-        IntTime=15;
-        JustSwitchedITime=1;
         DrawIntTime();
       }
-     if(IntTime==15 && JustSwitchedITime == 0){
-        IntTime=30;
-        JustSwitchedITime=1;
-        DrawIntTime();
-      }
-            if(IntTime==30 && JustSwitchedITime == 0){
-        IntTime=60;
-        JustSwitchedITime=1;
-        DrawIntTime();
-      }
-            if(IntTime==60 && JustSwitchedITime == 0){
-        IntTime=120;
-        JustSwitchedITime=1;
-        DrawIntTime();
-      }
-            if(IntTime==120 && JustSwitchedITime == 0){
-        IntTime=5;
-        JustSwitchedITime=1;
-        DrawIntTime();
-            }
-            JustSwitchedITime=0;
-    }
-      
-      
+
       //BUZZCHECK
       if ((x > 5 && x < 85) && (y > 56 && y < 97)){
         if (BUZZER == 0 && JustSwitchedBuzzer == 0) {
@@ -530,6 +513,7 @@ DrawTimedCountPage();    }
       }
     }
     //END OF PAGE0
+    
   }
  
 
@@ -656,16 +640,12 @@ if (page == 3) {
     if ((x > 85 && x < 122) && ( y > 178 && y < 210)) {
       if (page == 3 && JustSwitchedPage == 0) {
       AlertVal=AlertVal+1;
-        tft.fillRect(120,136,40,40,BLACK);
-
-        Serial.println( " plus");
+        tft.fillRect(120,136,60,60,BLACK);
       }
       }
     if ((x > 80 && x < 122) && ( y > 70 && y < 84)) {
       AlertVal=AlertVal-1;
-        tft.fillRect(120,136,40,40,BLACK);
-
-        Serial.println("minus");
+        tft.fillRect(120,136,60,60,BLACK);
     }
   }
 }
@@ -701,16 +681,13 @@ if (page == 4) {
     
     if ((x > 35 && x < 70) && ( y > 178 && y < 215)) {
       CalibrationVal=CalibrationVal+1;
-        tft.fillRect(160,136,40,40,BLACK);
-
-        Serial.println( " plus");
+        tft.fillRect(160,136,60,60,BLACK);
       
       }
+      
     if ((x > 35 && x < 70) && ( y > 60 && y < 88)) {
       CalibrationVal=CalibrationVal-1;
-        tft.fillRect(160,136,40,40,BLACK);
-
-        Serial.println("minus");
+        tft.fillRect(160,136,60,60,BLACK);
     }
   }
 }
@@ -825,6 +802,7 @@ StartCountVal=0;
 void DrawHomePage() {
   page = 0;
   JustSwitchedPage = 1;
+  AlertLevelCheck();
   tft.setFont();
   //DoseRATE
   tft.fillScreen(ILI9341_BLACK);
@@ -841,7 +819,24 @@ void DrawHomePage() {
   tft.drawBitmap(1, 264, settingsBitmap, 58, 58, ILI9341_WHITE);
 }
 
+void AlertLevelCheck(){
+  if (DoseLevel == 0){
+    
+    ColourDose = BLUE;
+    ColourBack = GREEN;
+  }
 
+  if(DoseLevel == 1){
+    ColourDose = YELLOW;
+    ColourBack = YELLOW;
+  }
+
+  if(DoseLevel == 2){
+    ColourDose = RED;
+    ColourBack = RED;
+  }
+
+}
 void DrawBattery() {
   tft.setFont();
   tft.fillRect(0,0,240,23, WHITE);
@@ -867,7 +862,7 @@ void DrawBuzzerHome() {
 }
 void DrawDoseHome() {
 
-  tft.fillRect(0, 27, 240, 80, BLUE);
+  tft.fillRect(0, 27, 240, 80, ColourDose);
   tft.setCursor(6, 47);
   tft.setTextColor(WHITE);
   tft.setTextSize(2);
@@ -884,7 +879,7 @@ void DrawDoseHome() {
   }
 }
 void DrawDoseEffect(){
-  tft.fillRect(60,60,60,30,BLUE);
+  tft.fillRect(60,60,60,30,ColourDose);
     tft.setCursor(65, 85);
 
     tft.print(Dose);
@@ -892,11 +887,20 @@ void DrawDoseEffect(){
 }
 
 void DrawBackgroundHome() {
-  tft.fillRect(0, 110, 240, 40, GREEN);
+  tft.fillRect(0, 110, 240, 40, ColourBack);
   tft.setTextColor(BLACK);
-  tft.setCursor(20, 120);
-  tft.println("Normal Background");
-  //CountS
+  tft.setCursor(19, 120);
+  if (DoseLevel == 0){
+      tft.println("Normal Background");
+  }
+
+  if(DoseLevel == 1){
+      tft.println("Elevated Background");
+  }
+
+  if(DoseLevel == 2){
+      tft.println("IN ALERT");
+  }  //CountS
   tft.fillRect(0, 153, 150, 35, CYAN);
   tft.setCursor(3, 162);
   tft.print(CurCount);
@@ -929,6 +933,18 @@ void DrawTimedCount() {
 }
 void DrawIntTime() {
   //INT TIME
+  if (integrationMode==0)
+  {
+    IntTime=60;
+    }
+    if (integrationMode==1)
+    {
+      IntTime=5;
+    }
+    if (integrationMode==2)
+    {
+      IntTime=180;
+    }
   tft.fillRect(153, 263, 84, 59, GREEN);
   tft.setCursor(179, 290);
   tft.setFont(&FreeSans12pt7b);
