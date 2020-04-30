@@ -763,7 +763,7 @@ if(page==6){
       {
         PreviousMillis = millis();
 tft.setTextColor(YELLOW);
-tft.fillRect(95,190,60,60,BLACK);
+tft.fillRect(95,190,600,60,BLACK);
 tft.setCursor(100,210);
 tft.println(CurCount);
 tft.setCursor(100,240);
@@ -779,11 +779,6 @@ DrawCountingRefresh();
     ElapsedTime=ConvertedVal;
     DrawCountingPageFinished();
   }
-
-
-
-
-
 
 
 
@@ -853,6 +848,7 @@ void AlertLevelCheck(){
     ColourBack = GREEN;
         if(ALevel!=0){
           ALevel=0;
+            tft.setTextSize(2);
            DrawDoseHome();
   DrawBackgroundHome();
   DrawCPM();
@@ -864,6 +860,8 @@ void AlertLevelCheck(){
     ColourDose = YELLOW;
     ColourBack = YELLOW;
         if(ALevel!=1){
+            tft.setTextSize(2);
+            tft.setFont();
           ALevel=1;
  DrawDoseHome();
   DrawBackgroundHome();
@@ -877,6 +875,8 @@ void AlertLevelCheck(){
     ColourBack = RED;
     if(ALevel!=2){
       ALevel=2;
+        tft.setTextSize(2);
+        tft.setFont();
      DrawDoseHome();
   DrawBackgroundHome();
   DrawCPM();
@@ -909,8 +909,8 @@ void DrawBuzzerHome() {
   }
 }
 void DrawDoseHome() {
-
-  tft.fillRect(0, 27, 240, 80, ColourDose);
+tft.setFont();
+tft.fillRect(0, 27, 240, 80, ColourDose);
   tft.setCursor(6, 47);
   if(ColourDose != YELLOW){
   tft.setTextColor(WHITE);
@@ -951,6 +951,7 @@ void DrawBackgroundHome() {
   }
 
   if(DoseLevel == 1){
+      tft.setCursor(15, 120);
       tft.println("Elevated Background");
   }
 
@@ -966,7 +967,7 @@ void DrawBackgroundHome() {
   tft.println("   Counts");
 }
 void DrawCountsRefresh(){
-    tft.fillRect(0,153,45,35,CYAN);
+    tft.fillRect(0,153,47,35,CYAN);
   tft.setCursor(3, 168);
   tft.setFont();
   tft.setTextSize(2);
@@ -1010,12 +1011,12 @@ void DrawIntTime() {
       IntTime=180;
     }
   tft.fillRect(153, 263, 84, 59, GREEN);
-  tft.setCursor(179, 280);
+  tft.setCursor(179, 285);
   tft.setFont(&FreeSans12pt7b);
     tft.setTextColor(WHITE);
       tft.setTextSize(0);
 
-  tft.println("INT");
+  tft.println("Int");
   tft.setCursor(174, 310);
   tft.print(IntTime);
   tft.println(" s");
@@ -1039,7 +1040,7 @@ if(DoseUnit==1){
 }
 }
 void RefreshCumuDose(){
-    tft.fillRect(0,220,35,37,MAGENTA);  
+    tft.fillRect(0,220,40,40,MAGENTA);  
     tft.setTextSize(0);
     tft.setTextColor(BLACK);
    tft.setFont(&FreeSans9pt7b);
@@ -1221,8 +1222,10 @@ tft.println("Cancel");
 }
 void DrawCountingPageFinished(){
 if(FinishedCount==0){
-tft.setTextColor(BLACK);
-tft.setCursor(187,296);
+tft.setCursor(33,296);
+
+  tft.setTextColor(BLACK);
+  tft.fillRect(12, 266, 95, 50, GREEN);
 tft.println("Ok");
 }
 FinishedCount=1;
