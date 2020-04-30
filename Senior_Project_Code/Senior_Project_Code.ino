@@ -47,6 +47,7 @@ int JustSwitchedPage = 0;
 int JustSwitchedLED = 0;
 int JustSwitchedBuzzer = 0;
 int LED;
+int RefreshCounter=0;
 int BUZZER;
 int Updated;
 int AlertVal;
@@ -58,7 +59,7 @@ int BatteryUpdate;
 int BatteryUpdateCounter = 29;
 float BatteryVal;
 float Battery_Per;
-
+int FinishedCount;
 char BackgroundText[30];
 //EEPROM ADDRESSES
 unsigned int conversionFactor = 175;
@@ -87,6 +88,7 @@ float TotalDose;
 char Dose[5];
 int DoseLevel;               // determines home screen warning signs
 int PreviousDoseLevel;
+int ALevel;
 const unsigned char gammaBitmap [] PROGMEM = {
   0x30, 0x00, 0x78, 0x70, 0xe8, 0xe0, 0xc4, 0xe0, 0x84, 0xc0, 0x05, 0xc0, 0x05, 0x80, 0x07, 0x80,
   0x03, 0x00, 0x07, 0x00, 0x0e, 0x00, 0x0e, 0x00, 0x1e, 0x00, 0x1e, 0x00, 0x1e, 0x00, 0x3e, 0x00,
@@ -268,6 +270,7 @@ void setup() {
   tft.fillScreen(ILI9341_BLACK);
  EEPROM.begin(4096);
   //    tft.setFont(&FreeSans9pt7b);
+    AlertLevelCheck();
     DrawHomePage();
      pinMode(D3, OUTPUT);
        digitalWrite(D3, LOW);
@@ -291,20 +294,13 @@ void loop() {
     BatteryUpdateCounter ++;
   if (BatteryUpdateCounter == 30){
     BatteryIn=analogRead(A0);
-//    Serial.print("Battery: ");
-//    Serial.println(BatteryIn);
     BatteryIn=constrain(BatteryIn, 590,800);
- //   Serial.print("Battery2: ");
- //   Serial.println(BatteryIn);
     BatteryPer = map(BatteryIn,590,800,100,0);
     BatteryVal = BatteryPer/100;
- //       Serial.print("BatteryVal: ");
- //   Serial.println(BatteryVal);
   Battery_Per = 24 * BatteryVal;
   tft.fillRect(211, 5, Battery_Per, 12, BLACK);
   BatteryUpdateCounter=0;
- //     Serial.print("BatteryPer: ");
- //   Serial.println(Battery_Per);
+
   }
   int X_Coord;
   int Y_Coord;
@@ -380,14 +376,18 @@ void loop() {
       if (AvgCount < conversionFactor/2) {
         DoseLevel = 0; // determines alert level displayed on homescreen
           AlertLevelCheck();
+          
      }
       else if (AvgCount < AlertVal * conversionFactor){
         DoseLevel = 1;
           AlertLevelCheck();
+         
       }
       else
       {
-        DoseLevel = 2;}
+        DoseLevel = 2;
+        AlertLevelCheck();
+        }
 
       if (DoseRate < 10.0)
       {
@@ -408,20 +408,12 @@ void loop() {
 
 
       Serial.println(CurCount);
+      RefreshCumuDose();
+      DrawCountsRefresh();
      }  // end of millis()-controlled block that runs once every second. The rest of the code on page 0 runs every loop
-    if (CurCount > PrevCount)
-    {
-      PrevCount = CurCount;
-      previousMicros = micros();
-    }
-    currentMicros = micros();
-    if (currentMicros - previousMicros >= 200)
-    {
-      digitalWrite(D3, LOW);
-      digitalWrite(D0, LOW);
-      previousMicros = currentMicros;
-    }
 
+
+   
   
 
     if (!ts.touched()) {
@@ -516,7 +508,22 @@ DrawTimedCountPage();    }
     
   }
  
-
+    if (CurCount > PrevCount)
+    { 
+      if (LED)
+        digitalWrite(D3, HIGH); // trigger buzzer and led if they are activated
+//      if (BUZZER)
+//        digitalWrite(D0, HIGH);
+      PrevCount = CurCount;
+      previousMicros = micros();
+    }
+    currentMicros = micros();
+    if (currentMicros - previousMicros >= 200)
+    {
+      digitalWrite(D3, LOW);
+      digitalWrite(D0, LOW);
+      previousMicros = currentMicros;
+    }
 
   if (page == 1) {
     if (!ts.touched()) {
@@ -692,6 +699,7 @@ if (page == 4) {
   }
 }
 if(page==5){
+  ElapsedTime=0;
   tft.setFont(&FreeSans12pt7b);
   tft.setCursor(170,175);
   tft.println(TimedCountVal);
@@ -721,7 +729,7 @@ if(page==5){
     {
       if (page == 5 && JustSwitchedPage == 0);
       {
-        DrawSettingsPage();
+        DrawHomePage();
       }
     }
     
@@ -741,26 +749,45 @@ if(page==5){
   }
 }
 if(page==6){
-
-  Serial.print("StartMillis: ");
-  Serial.println(StartMillis);
-  tft.setFont(&FreeSans12pt7b);
-  tft.setCursor(170,180);
-  tft.println(TimedCountVal);
   ConvertedVal=TimedCountVal;
   ConvertedVal=ConvertedVal*60000;
-  Serial.print("ConvertedVal: ");
-  Serial.println(ConvertedVal);
-  PerCountVal =  PerCountVal=StartMillis;
+   tft.setFont(&FreeSans12pt7b);
+  tft.setCursor(170,180);
+  tft.print(TimedCountVal);
+  tft.println(" m");
+  if ( ConvertedVal > ElapsedTime){
+  ElapsedTime = millis() - StartMillis;
+  CPM = float(CurCount) / float((1 + ElapsedTime) / 60000.0);
+
+    if((millis() - PreviousMillis) >= 1000)
+      {
+        PreviousMillis = millis();
+tft.setTextColor(YELLOW);
+tft.fillRect(95,190,60,60,BLACK);
+tft.setCursor(100,210);
+tft.println(CurCount);
+tft.setCursor(100,240);
+tft.println(CPM);
+
+      }
+ PerCountVal =  PerCountVal=ElapsedTime;
 PerCountVal = PerCountVal/ConvertedVal;
-  Serial.print("PerCountVal: ");
-  Serial.println(PerCountVal);
+
 DrawCountingRefresh();
-  if (PerCountVal==1){
-tft.fillRect(72, 266, 95, 50, GREEN);
-tft.println("Ok");
-StartCountVal=0;
   }
+  else if (ElapsedTime >= ConvertedVal){
+    ElapsedTime=ConvertedVal;
+    DrawCountingPageFinished();
+  }
+
+
+
+
+
+
+
+
+
   
     if (!ts.touched()) {
     WasTouched = 0;
@@ -802,13 +829,13 @@ StartCountVal=0;
 void DrawHomePage() {
   page = 0;
   JustSwitchedPage = 1;
-  AlertLevelCheck();
   tft.setFont();
   //DoseRATE
   tft.fillScreen(ILI9341_BLACK);
   DrawBattery();
   DrawDoseHome();
   DrawBackgroundHome();
+  DrawCPM();
   DrawCumulativeDose();
   DrawBuzzerHome();
   DrawLEDHome();
@@ -820,20 +847,41 @@ void DrawHomePage() {
 }
 
 void AlertLevelCheck(){
+  
   if (DoseLevel == 0){
-    
     ColourDose = BLUE;
     ColourBack = GREEN;
+        if(ALevel!=0){
+          ALevel=0;
+           DrawDoseHome();
+  DrawBackgroundHome();
+  DrawCPM();
+  DrawCumulativeDose();
+    }
   }
 
   if(DoseLevel == 1){
     ColourDose = YELLOW;
     ColourBack = YELLOW;
+        if(ALevel!=1){
+          ALevel=1;
+ DrawDoseHome();
+  DrawBackgroundHome();
+  DrawCPM();
+  DrawCumulativeDose();    
+  }
   }
 
   if(DoseLevel == 2){
     ColourDose = RED;
     ColourBack = RED;
+    if(ALevel!=2){
+      ALevel=2;
+     DrawDoseHome();
+  DrawBackgroundHome();
+  DrawCPM();
+  DrawCumulativeDose();
+    }
   }
 
 }
@@ -864,11 +912,16 @@ void DrawDoseHome() {
 
   tft.fillRect(0, 27, 240, 80, ColourDose);
   tft.setCursor(6, 47);
+  if(ColourDose != YELLOW){
   tft.setTextColor(WHITE);
+  }
+  else
+    tft.setTextColor(BLACK);
+
   tft.setTextSize(2);
   tft.println("Effective Dose Rate");
 
-  tft.setCursor(110, 70);
+  tft.setCursor(110, 75);
 //  tft.print(Dose);
   if (DoseUnit == 0) {
     tft.println(" uS/h");
@@ -879,10 +932,13 @@ void DrawDoseHome() {
   }
 }
 void DrawDoseEffect(){
+   tft.setTextColor(WHITE);
+  tft.setTextSize(2);
+  tft.setFont();
   tft.fillRect(60,60,60,30,ColourDose);
-    tft.setCursor(65, 85);
+    tft.setCursor(65, 75);
 
-    tft.print(Dose);
+    tft.println(Dose);
 
 }
 
@@ -901,16 +957,23 @@ void DrawBackgroundHome() {
   if(DoseLevel == 2){
       tft.println("IN ALERT");
   }  //CountS
+}
+ void DrawCPM(){
   tft.fillRect(0, 153, 150, 35, CYAN);
   tft.setCursor(3, 162);
+  tft.setTextColor(BLACK);
   tft.print(CurCount);
-  if (CountUnit == 0) {
-    tft.println(" CPM");
-  }
-  else if (CountUnit == 1) {
-    tft.println(" CPS");
-  }
+  tft.println("   Counts");
 }
+void DrawCountsRefresh(){
+    tft.fillRect(0,153,45,35,CYAN);
+  tft.setCursor(3, 168);
+  tft.setFont();
+  tft.setTextSize(2);
+  tft.setTextColor(BLACK);
+  tft.print(AvgCount);
+}
+
 void DrawLEDHome() {
   //LED
   tft.fillRect(153, 153, 84, 54, BLUE);
@@ -922,6 +985,7 @@ void DrawLEDHome() {
     tft.drawBitmap(173, 157, ledOffBitmap, 45, 45, ILI9341_WHITE);
   }
 }
+
 void DrawTimedCount() {
   //TO GO TO TIMED Count
   tft.fillRect(64, 263, 86, 59, GREEN);
@@ -946,8 +1010,11 @@ void DrawIntTime() {
       IntTime=180;
     }
   tft.fillRect(153, 263, 84, 59, GREEN);
-  tft.setCursor(179, 290);
+  tft.setCursor(179, 280);
   tft.setFont(&FreeSans12pt7b);
+    tft.setTextColor(WHITE);
+      tft.setTextSize(0);
+
   tft.println("INT");
   tft.setCursor(174, 310);
   tft.print(IntTime);
@@ -961,17 +1028,28 @@ void DrawCumulativeDose() {
   tft.setTextSize(0);
   tft.setFont(&FreeSans9pt7b);
   tft.println("Cumulative Dose");
-  tft.print(Dose);
-  tft.println(" CPM");
-  tft.print(Counts);
+  tft.print(CPM);
+  tft.println("   CPM");
+  tft.print(TotalDose);
 if(DoseUnit==0){
-  tft.println(" uSv/H");
+  tft.println("  uSv/H");
 }
 if(DoseUnit==1){
-  tft.println(" mRem/h");
+  tft.println("  mRem/h");
 }
 }
+void RefreshCumuDose(){
+    tft.fillRect(0,220,35,37,MAGENTA);  
+    tft.setTextSize(0);
+    tft.setTextColor(BLACK);
+   tft.setFont(&FreeSans9pt7b);
+   tft.setCursor(2, 235);
+   tft.println(CurCount);
+  //tft.print(TotalDose);
+      tft.setCursor(2,255);
+      tft.println(TotalDose);
 
+}
 void DrawBackButton() {
   tft.fillRect(3, 276, 65, 40, GREEN);
   tft.drawBitmap(3, 273, BackBitmap, 62, 45, WHITE);
@@ -1077,6 +1155,7 @@ tft.fillRect(182,96,4,20,WHITE);
 tft.fillRect(176,104,20,4,WHITE);
 tft.fillRect(176,224,20,4,WHITE);
 }
+
 void DrawTimedCountPage(){
   page=5;
   DrawSettingNeeds();
@@ -1101,7 +1180,7 @@ void DrawTimedCountPage(){
     tft.setTextColor(YELLOW);
 }
 void DrawCountingRefresh(){
-    tft.fillRect(15,115,210*PerCountVal,35,GREEN);
+tft.fillRect(15,115,210*PerCountVal,35,GREEN);
 }
 void DrawCountingPage(){
     page=6;
@@ -1123,12 +1202,30 @@ ProgCountVal=TimedCountVal;
   tft.setCursor(177,302);
   tft.drawRect(15,115, 210, 35, ILI9341_WHITE);
 tft.setCursor(65,180);
-tft.println("Duration");
-tft.setCursor(83,296);
+tft.println("Duration:");
+tft.setCursor(13,210);
+tft.println("Counts:");
+tft.setCursor(13,240);
+tft.println("CPM:");
+tft.setCursor(23,296);
   tft.setTextColor(BLACK);
-  tft.fillRect(72, 266, 95, 50, GREEN);
+  tft.fillRect(12, 266, 95, 50, GREEN);
 tft.println("Cancel");
+
+
   tft.setTextColor(YELLOW);
+  CurCount = 0;
+  StartMillis = millis();
+  IntervalMillis = TimedCountVal * 60000;
+  FinishedCount=0;
+}
+void DrawCountingPageFinished(){
+if(FinishedCount==0){
+tft.setTextColor(BLACK);
+tft.setCursor(187,296);
+tft.println("Ok");
+}
+FinishedCount=1;
 }
 
 long EEPROMReadlong(long address) {
